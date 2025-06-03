@@ -15,6 +15,7 @@ case oneMonth = 1
 case threeMonths = 3
 case sixMonths = 6
 
+```
 var description: String {
     switch self {
     case .oneMonth: return "1ヶ月定期"
@@ -22,7 +23,9 @@ var description: String {
     case .sixMonths: return "6ヶ月定期"
     }
 }
+```
 
+}
 
 /// 払戻結果
 struct RefundResult {
@@ -36,7 +39,7 @@ let calculationDetails: String // 計算詳細
 
 class SectionChangeRefundCalculator {
 
-
+```
 /// 区間変更払い戻し計算専用データ
 struct SectionChangeRefundData {
     // 基本入力データ
@@ -140,13 +143,16 @@ private func validateInput(data: SectionChangeRefundData) -> String? {
     
     return nil
 }
+```
 
+}
 
 // MARK: - 使用例
 
 /// 使用例を示すクラス
 class SectionChangeRefundDemo {
 
+```
 func runDemo() {
     print("=== 区間変更払い戻し計算システム ===\n")
     
@@ -256,4 +262,7 @@ private func executeCalculation(data: SectionChangeRefundCalculator.SectionChang
     print()
     print("---")
     print()
+}
+```
+
 }
