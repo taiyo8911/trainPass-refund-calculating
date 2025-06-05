@@ -106,7 +106,7 @@ class RefundCalculationEngine {
     private func calculateMonthlyBasis(_ data: RefundData) -> (RefundResult, RefundCalculationDetail) {
         // 1ヶ月定期の場合は7日以降は払戻なし
         if data.passType == .oneMonth {
-            return createNoRefundResult(data, reason: "1ヶ月定期は使用開始から7日以降は払戻不可（経過日数: \(data.elapsedDays)日）")
+            return createNoRefundResult(data, reason: "1ヶ月定期は使用開始から8日以降は払戻不可（経過日数: \(data.elapsedDays)日）")
         }
 
         // 残存期間チェック
