@@ -65,21 +65,40 @@ class SectionChangeRefundCalculator {
 
     /// 区間変更払い戻し計算を実行
     func calculate(data: SectionChangeRefundData) -> RefundResult {
+        print("=== 区間変更払い戻し計算 ===")
+        print()
+
         // 入力検証
         if let error = validateInput(data: data) {
+            print("❌ エラー: \(error)")
             return RefundResult(
                 refundAmount: 0,
                 usedAmount: 0,
                 processingFee: data.processingFee,
-                calculationDetails: error
-                )
+                calculationDetails: "エラー: \(error)"
+            )
         }
+
+        print("✅ \(data.passType.description)")
+        print("   購入価格: \(data.purchasePrice)円")
+        print("   開始日: \(formatDate(data.startDate))")
+        print("   払戻日: \(formatDate(data.refundDate))")
+        print("   使用日数: \(data.elapsedDays)日")
+        print("   使用旬数: \(data.usedJun)旬")
+        print("   日割運賃: \(data.dailyFare)円/日")
+        print()
 
         // 使用分運賃を計算
         let usedFare = data.usedJun * data.dailyFare * 10
 
+        print("   使用分運賃計算: \(data.usedJun)旬 × \(data.dailyFare)円 × 10 = \(usedFare)円")
+
         // 最終払戻額を計算
         let refundAmount = max(0, data.purchasePrice - usedFare - data.processingFee)
+
+        print("   計算式: \(data.purchasePrice)円 - \(usedFare)円 - \(data.processingFee)円")
+        print("   最終払戻額: \(refundAmount)円")
+        print()
 
         let details = """
         【区間変更払い戻し計算】
@@ -90,10 +109,10 @@ class SectionChangeRefundCalculator {
         """
 
         return RefundResult(
-        refundAmount: refundAmount,
-        usedAmount: usedFare,
-        processingFee: data.processingFee,
-        calculationDetails: details
+            refundAmount: refundAmount,
+            usedAmount: usedFare,
+            processingFee: data.processingFee,
+            calculationDetails: details
         )
     }
 
@@ -111,10 +130,16 @@ class SectionChangeRefundCalculator {
         }
         return nil
     }
+
+    /// 日付を読みやすい形式でフォーマット
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy年MM月dd日"
+        return formatter.string(from: date)
+    }
 }
 
-
-// MARK: - 使用例
+// MARK: - 使用例とデモ
 
 /// 使用例を示すクラス
 class SectionChangeRefundDemo {
@@ -221,8 +246,8 @@ class SectionChangeRefundDemo {
             print("- 計算式: \(data.purchasePrice)円 - \(sectionChangeUsedFare)円 - \(data.processingFee)円 = \(sectionChangeResult.refundAmount)円")
             print("- 最終払戻額: \(sectionChangeResult.refundAmount)円")
         } else {
-        print("【エラー・払戻不可】")
-        print("- 結果: \(sectionChangeResult.calculationDetails)")
+            print("【エラー・払戻不可】")
+            print("- 結果: \(sectionChangeResult.calculationDetails)")
         }
         print()
         print("---")

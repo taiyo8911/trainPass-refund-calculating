@@ -119,18 +119,25 @@ class RegularRefundCalculator {
 
         // 使用開始後7日以内の場合
         if data.elapsedDays <= 7 {
-            // 7日以内の場合の払戻額の計算
-            // 払戻額 = 購入価格 - (往復運賃 × 使用日数) - 手数料）
-            let refundAmount = max(0, data.purchasePrice - (data.roundTripFare * data.elapsedDays) - data.processingFee)
+            print("⚠️  使用開始から7日以内の払戻のため、特別計算を適用します")
+            let usedAmount = data.roundTripFare * data.elapsedDays
+            let refundAmount = max(0, data.purchasePrice - usedAmount - data.processingFee)
+
+            print("   計算式: \(data.purchasePrice)円 - (\(data.roundTripFare)円 × \(data.elapsedDays)日) - \(data.processingFee)円")
+            print("   計算結果: \(refundAmount)円")
+            print()
+
             return RefundResult(
                 refundAmount: refundAmount,
-                usedAmount: data.roundTripFare * data.elapsedDays,
+                usedAmount: usedAmount,
                 processingFee: data.processingFee,
                 calculationDetails: "使用開始から7日以内のため、特別な払戻額を計算しました"
             )
         }
         // 使用開始から7日を超えた場合
         else {
+            print("❌ 使用開始から7日を超えているため払戻額はありません")
+            print()
             return RefundResult(
                 refundAmount: 0,
                 usedAmount: data.purchasePrice,
@@ -162,12 +169,29 @@ class RegularRefundCalculator {
         print("   有効期間: \(formatDate(data.startDate)) ～ \(formatDate(data.endDate))")
         print("   払戻日: \(formatDate(data.refundDate))")
         print("   使用日数: \(data.elapsedDays)日")
-
-        // 7日以内の場合の注意
-        if data.elapsedDays <= 7 {
-            print("⚠️  使用開始から7日以内の払戻のため、計算方法が変わります")
-        }
         print()
+
+        // 使用開始から7日以内の場合
+        if data.elapsedDays <= 7 {
+            print("⚠️  使用開始から7日以内の払戻のため、特別計算を適用します")
+            let usedAmount = data.roundTripFare * data.elapsedDays
+            let refundAmount = max(0, data.purchasePrice - usedAmount - data.processingFee)
+
+            print("   計算式: \(data.purchasePrice)円 - (\(data.roundTripFare)円 × \(data.elapsedDays)日) - \(data.processingFee)円")
+            print("   計算結果: \(refundAmount)円")
+            print()
+
+            return RefundResult(
+                refundAmount: refundAmount,
+                usedAmount: usedAmount,
+                processingFee: data.processingFee,
+                calculationDetails: "使用開始から7日以内のため、特別な払戻額を計算しました"
+            )
+        }
+
+        // 7日を超えた場合の通常計算
+        print("   残存月数: \(data.remainingMonths)ヶ月、残存日数: \(data.remainingDays)日")
+        print("   使用月数: \(data.usedMonths)ヶ月")
 
         // 残存期間の確認
         if data.remainingMonths < 1 {
@@ -179,9 +203,6 @@ class RegularRefundCalculator {
                 calculationDetails: "残存期間が1ヶ月未満のため払い戻しはありません"
             )
         }
-
-        print("   残存月数: \(data.remainingMonths)ヶ月、残存日数: \(data.remainingDays)日")
-        print("   使用月数: \(data.usedMonths)ヶ月")
         print()
 
         // 使用済みの運賃を計算
@@ -270,15 +291,31 @@ class RegularRefundCalculator {
             print("   3ヶ月定期運賃: \(threeMonthFare)円")
         }
         print("   使用日数: \(data.elapsedDays)日")
-
-        // 7日以内の場合の注意
-        if data.elapsedDays <= 7 {
-            print("⚠️  使用開始から7日以内の払戻のため、計算方法が変わります")
-        }
         print()
 
-        // 残存期間の確認
+        // 使用開始から7日以内の場合
+        if data.elapsedDays <= 7 {
+            print("⚠️  使用開始から7日以内の払戻のため、特別計算を適用します")
+            let usedAmount = data.roundTripFare * data.elapsedDays
+            let refundAmount = max(0, data.purchasePrice - usedAmount - data.processingFee)
+
+            print("   計算式: \(data.purchasePrice)円 - (\(data.roundTripFare)円 × \(data.elapsedDays)日) - \(data.processingFee)円")
+            print("   計算結果: \(refundAmount)円")
+            print()
+
+            return RefundResult(
+                refundAmount: refundAmount,
+                usedAmount: usedAmount,
+                processingFee: data.processingFee,
+                calculationDetails: "使用開始から7日以内のため、特別な払戻額を計算しました"
+            )
+        }
+
+        // 7日を超えた場合の通常計算
         print("   残存月数: \(data.remainingMonths)ヶ月、残存日数: \(data.remainingDays)日")
+        print("   使用月数: \(data.usedMonths)ヶ月")
+
+        // 残存期間の確認
         if data.remainingMonths < 1 {
             print("❌ \(data.usedMonths)ヶ月以上使用しているため払い戻しはありません")
             return RefundResult(
@@ -288,8 +325,6 @@ class RegularRefundCalculator {
                 calculationDetails: "残存期間が1ヶ月未満のため払い戻しはありません"
             )
         }
-
-        print("   使用月数: \(data.usedMonths)ヶ月")
         print()
 
         // 使用分運賃を計算
