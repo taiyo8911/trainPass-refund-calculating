@@ -29,3 +29,16 @@ struct RefundResult {
     let processingFee: Int       // 手数料
     let calculationDetails: String // 計算詳細
 }
+
+/// 払戻計算方式
+enum RefundCalculationType: String, CaseIterable {
+    case regular = "regular"
+    case sectionChange = "sectionChange"
+
+    var description: String {
+        switch self {
+        case .regular: return "通常払戻"
+        case .sectionChange: return "区間変更払戻"
+        }
+    }
+}

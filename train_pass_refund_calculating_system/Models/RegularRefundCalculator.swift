@@ -1,29 +1,13 @@
+//
+//  RegularRefundCalculator.swift
+//  train_pass_refund_calculating_system
+//
+//  Created by Taiyo KOSHIBA on 2025/06/03.
+//
+
 import Foundation
 
-// MARK: - データ構造
-
-/// 定期券の種類
-enum PassType: Int, CaseIterable {
-    case oneMonth = 1
-    case threeMonths = 3
-    case sixMonths = 6
-
-    var description: String {
-        switch self {
-        case .oneMonth: return "1ヶ月定期"
-        case .threeMonths: return "3ヶ月定期"
-        case .sixMonths: return "6ヶ月定期"
-        }
-    }
-}
-
-/// 払戻結果
-struct RefundResult {
-    let refundAmount: Int        // 最終払戻額
-    let usedAmount: Int          // 使用分運賃
-    let processingFee: Int       // 手数料
-    let calculationDetails: String // 計算詳細
-}
+// MARK: - 通常払戻計算用データ
 
 /// 通常払戻計算用データ
 struct RefundData {
@@ -137,11 +121,12 @@ class RegularRefundCalculator {
         if data.elapsedDays <= 7 {
             // 7日以内の場合の払戻額の計算
             // 払戻額 = 購入価格 - (往復運賃 × 使用日数) - 手数料）
+            let refundAmount = max(0, data.purchasePrice - (data.roundTripFare * data.elapsedDays) - data.processingFee)
             return RefundResult(
-                refundAmount: data.purchasePrice - (data.roundTripFare * data.elapsedDays) - data.processingFee,
+                refundAmount: refundAmount,
                 usedAmount: data.roundTripFare * data.elapsedDays,
                 processingFee: data.processingFee,
-                calculationDetails: "使用開始から7日以内のため、払戻額を計算しました"
+                calculationDetails: "使用開始から7日以内のため、特別な払戻額を計算しました"
             )
         }
         // 使用開始から7日を超えた場合
@@ -152,7 +137,8 @@ class RegularRefundCalculator {
                 processingFee: data.processingFee,
                 calculationDetails: "使用開始から7日を超えた場合、払戻額はありません"
             )
-        }    }
+        }
+    }
 
     // MARK: - 3ヶ月定期の払い戻し計算
 

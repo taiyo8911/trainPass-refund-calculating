@@ -5,15 +5,7 @@
 //  Created by Taiyo KOSHIBA on 2025/06/03.
 //
 
-//
-//  SectionChangeRefundCalculator.swift
-//  train_pass_refund_calculating_system
-//
-//  Created by Taiyo KOSHIBA on 2025/06/03.
-//
-
 import Foundation
-
 
 // MARK: - 区間変更払い戻し計算（完全独立）
 class SectionChangeRefundCalculator {
