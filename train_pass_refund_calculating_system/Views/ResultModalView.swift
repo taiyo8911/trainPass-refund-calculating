@@ -2,11 +2,12 @@
 //  ResultModalView.swift
 //  train_pass_refund_calculating_system
 //
-//  Created by Taiyo KOSHIBA on 2025/06/05.
+//  Created by Taiyo KOSHIBA on 2025/06/06.
 //
 
 import SwiftUI
 
+// MARK: - 結果モーダルビュー
 struct ResultModalView: View {
     @Bindable var calculationState: RefundCalculationState
 
@@ -56,6 +57,96 @@ struct ResultModalView: View {
     }
 }
 
+// MARK: - メイン結果カード
+struct MainResultCard: View {
+    let result: RefundResult
+    let calculationType: RefundCalculationType
+    let calculationState: RefundCalculationState
+
+    var body: some View {
+        VStack(spacing: 16) {
+            // 結果ステータス
+            HStack {
+                Image(systemName: result.refundAmount > 0 ? "checkmark.circle.fill" : "xmark.circle.fill")
+                    .font(.title2)
+                    .foregroundColor(result.refundAmount > 0 ? .green : .red)
+
+                Text(result.refundAmount > 0 ? "払戻可能" : "払戻不可")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(result.refundAmount > 0 ? .green : .red)
+
+                Spacer()
+            }
+
+            Divider()
+
+            // 詳細情報
+            VStack(spacing: 12) {
+                ResultDetailRow(title: "計算方式", value: calculationType.description)
+
+                ResultDetailRow(title: "定期購入金額", value: "¥\(Int(calculationState.purchasePrice) ?? 0)")
+
+                ResultDetailRow(title: "経過日数", value: "\(calculateElapsedDays(from: calculationState.startDate, to: calculationState.refundDate))日")
+
+                ResultDetailRow(title: "使用分運賃", value: "¥\(result.usedAmount.formattedWithComma)")
+
+                ResultDetailRow(title: "手数料", value: "¥\(result.processingFee.formattedWithComma)")
+            }
+
+            Divider()
+
+            // 払戻額（大きく表示）
+            VStack(spacing: 8) {
+                Text("払戻額")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+
+                Text("¥\(result.refundAmount.formattedWithComma)")
+                    .font(.system(size: 36, weight: .bold, design: .rounded))
+                    .foregroundColor(result.refundAmount > 0 ? .primary : .red)
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+        )
+    }
+
+    // 経過日数計算のヘルパー関数
+    private func calculateElapsedDays(from startDate: Date, to endDate: Date) -> Int {
+        let calendar = Calendar.current
+        let normalizedStartDate = calendar.startOfDay(for: startDate)
+        let normalizedEndDate = calendar.startOfDay(for: endDate)
+
+        let components = calendar.dateComponents([.day], from: normalizedStartDate, to: normalizedEndDate)
+        return (components.day ?? 0) + 1 // 開始日を含むため+1
+    }
+}
+
+// MARK: - 結果詳細行
+struct ResultDetailRow: View {
+    let title: String
+    let value: String
+
+    var body: some View {
+        HStack {
+            Text(title)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+
+            Spacer()
+
+            Text(value)
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundColor(.primary)
+        }
+    }
+}
+
 // MARK: - 結果画面専用アクションボタンカード
 struct ResultActionButtonsCard: View {
     @Bindable var calculationState: RefundCalculationState
@@ -92,8 +183,17 @@ struct ResultActionButtonsCard: View {
     }
 }
 
+// MARK: - 拡張メソッド
+extension Int {
+    var formattedWithComma: String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        return formatter.string(from: NSNumber(value: self)) ?? String(self)
+    }
+}
+
 // MARK: - プレビュー
-#Preview {
+#Preview("払戻可能ケース") {
     let state = RefundCalculationState()
     state.result = RefundResult(
         refundAmount: 15000,
@@ -103,6 +203,22 @@ struct ResultActionButtonsCard: View {
     )
     state.calculationType = .regular
     state.passType = .threeMonths
+    state.purchasePrice = "20000"
+
+    return ResultModalView(calculationState: state)
+}
+
+#Preview("払戻不可ケース") {
+    let state = RefundCalculationState()
+    state.result = RefundResult(
+        refundAmount: 0,
+        usedAmount: 18000,
+        processingFee: 220,
+        calculationDetails: "1ヶ月定期は使用開始から8日以降は払戻不可（経過日数: 15日）"
+    )
+    state.calculationType = .regular
+    state.passType = .oneMonth
+    state.purchasePrice = "16000"
 
     return ResultModalView(calculationState: state)
 }
