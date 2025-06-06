@@ -79,36 +79,39 @@ struct RefundData {
         // 往復普通運賃を計算
         self.roundTripFare = oneWayFare * 2
 
-        // 終了日を計算（開始日から期間後の前日）
+        // カレンダーインスタンス
         let calendar = Calendar.current
-        let tempEndDate: Date
-        switch passType {
-        case .oneMonth:
-            tempEndDate = calendar.date(byAdding: .month, value: 1, to: startDate) ?? startDate
-        case .threeMonths:
-            tempEndDate = calendar.date(byAdding: .month, value: 3, to: startDate) ?? startDate
-        case .sixMonths:
-            tempEndDate = calendar.date(byAdding: .month, value: 6, to: startDate) ?? startDate
-        }
-        self.endDate = calendar.date(byAdding: .day, value: -1, to: tempEndDate) ?? tempEndDate
 
-        // 使用日数を計算（開始日を含む）- 時刻の影響を排除
+        // 日付を正規化（時刻の影響を排除）
         let normalizedStartDate = calendar.startOfDay(for: startDate)
         let normalizedRefundDate = calendar.startOfDay(for: refundDate)
 
+        // 終了日を計算（開始日から期間後の前日）
+        let tempEndDate: Date
+        switch passType {
+        case .oneMonth:
+            tempEndDate = calendar.date(byAdding: .month, value: 1, to: normalizedStartDate) ?? normalizedStartDate
+        case .threeMonths:
+            tempEndDate = calendar.date(byAdding: .month, value: 3, to: normalizedStartDate) ?? normalizedStartDate
+        case .sixMonths:
+            tempEndDate = calendar.date(byAdding: .month, value: 6, to: normalizedStartDate) ?? normalizedStartDate
+        }
+        self.endDate = calendar.date(byAdding: .day, value: -1, to: tempEndDate) ?? tempEndDate
+
+        // 使用日数を計算（開始日を含む）
         let elapsedComponents = calendar.dateComponents([.day], from: normalizedStartDate, to: normalizedRefundDate)
         self.elapsedDays = (elapsedComponents.day ?? 0) + 1
 
         // 残存日数を計算
-        let remainingComponents = calendar.dateComponents([.day], from: refundDate, to: self.endDate)
+        let remainingComponents = calendar.dateComponents([.day], from: normalizedRefundDate, to: self.endDate)
         self.remainingDays = remainingComponents.day ?? 0
 
         // 残存月数を計算
-        let remainingMonthComponents = calendar.dateComponents([.month], from: refundDate, to: self.endDate)
+        let remainingMonthComponents = calendar.dateComponents([.month], from: normalizedRefundDate, to: self.endDate)
         self.remainingMonths = remainingMonthComponents.month ?? 0
 
-        // 使用月数を計算（開始日を含め、払戻日の月まで）
-        let monthComponents = calendar.dateComponents([.month, .day], from: startDate, to: refundDate)
+        // 使用月数を計算（正規化した日付を使用）
+        let monthComponents = calendar.dateComponents([.month, .day], from: normalizedStartDate, to: normalizedRefundDate)
         let months = (monthComponents.month ?? 0) + 1 // 開始月を含めるため+1
         self.usedMonths = months
     }

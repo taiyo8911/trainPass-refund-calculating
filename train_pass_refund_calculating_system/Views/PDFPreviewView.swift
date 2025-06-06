@@ -458,13 +458,11 @@ class PDFGenerator {
             let usedJun = fullJun + (remainder > 0 ? 1 : 0)
             return "\(elapsedDays)日間（\(usedJun)旬）"
         } else {
-            // 通常払戻の場合：月数表示
+            // 通常払戻の場合：7日以内の場合のみ特別表示、それ以外は日数のみ
             if elapsedDays <= 7 {
                 return "\(elapsedDays)日間（7日以内）"
             } else {
-                let monthComponents = calendar.dateComponents([.month], from: inputData.startDate, to: inputData.refundDate)
-                let usedMonths = (monthComponents.month ?? 0) + 1
-                return "\(elapsedDays)日間（約\(usedMonths)ヶ月）"
+                return "\(elapsedDays)日間"
             }
         }
     }
@@ -495,8 +493,8 @@ class PDFGenerator {
                     return "往復運賃 ¥\(oneWayFare * 2) × \(elapsedDays)日"
                 }
             } else {
-                // 月単位計算の場合
-                let monthComponents = calendar.dateComponents([.month], from: inputData.startDate, to: inputData.refundDate)
+                // 月単位計算の場合（正規化した日付を使用）
+                let monthComponents = calendar.dateComponents([.month], from: normalizedStartDate, to: normalizedRefundDate)
                 let usedMonths = (monthComponents.month ?? 0) + 1
 
                 if inputData.passType == .sixMonths && usedMonths >= 3 {
