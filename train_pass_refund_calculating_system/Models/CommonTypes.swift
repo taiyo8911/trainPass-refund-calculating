@@ -170,3 +170,14 @@ struct SectionChangeRefundData {
         self.dailyFare = Int(ceil(fare)) // 1円未満切り上げ
     }
 }
+
+// MARK: - 拡張メソッド
+
+extension Int {
+    /// カンマ区切りの文字列を返す
+    var formattedWithComma: String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        return formatter.string(from: NSNumber(value: self)) ?? String(self)
+    }
+}

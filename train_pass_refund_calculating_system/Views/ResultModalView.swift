@@ -183,15 +183,6 @@ struct ResultActionButtonsCard: View {
     }
 }
 
-// MARK: - 拡張メソッド
-extension Int {
-    var formattedWithComma: String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        return formatter.string(from: NSNumber(value: self)) ?? String(self)
-    }
-}
-
 // MARK: - プレビュー
 #Preview("払戻可能ケース") {
     let state = RefundCalculationState()

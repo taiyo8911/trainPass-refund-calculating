@@ -204,27 +204,27 @@ class PDFGenerator {
     private func drawPDFContent(result: RefundResult, calculationType: RefundCalculationType, inputData: PDFInputData) {
         var yPosition: CGFloat = margin
 
-        // ヘッダー
+        // 1. ヘッダー
         yPosition = drawHeader(yPosition: yPosition)
         yPosition += 30
 
-        // 基本情報
-        yPosition = drawBasicInfo(inputData: inputData, yPosition: yPosition)
+        // 2. 定期券詳細セクション
+        yPosition = drawPassDetailSection(inputData: inputData, yPosition: yPosition)
         yPosition += 20
 
-        // 計算結果
-        yPosition = drawResult(result: result, yPosition: yPosition)
+        // 3. 使用状況セクション
+        yPosition = drawUsageStatusSection(result: result, inputData: inputData, yPosition: yPosition)
         yPosition += 20
 
-        // 計算詳細
-        yPosition = drawCalculationDetails(result: result, calculationType: calculationType, yPosition: yPosition)
+        // 4. 払戻金額セクション
+        yPosition = drawRefundCalculationSection(result: result, inputData: inputData, yPosition: yPosition)
 
-        // フッター
+        // 5. フッター
         drawFooter()
     }
 
     private func drawHeader(yPosition: CGFloat) -> CGFloat {
-        let title = "通勤定期券払戻計算書"
+        let title = "定期券払戻計算書"
         let titleFont = UIFont.boldSystemFont(ofSize: 24)
         let titleAttributes: [NSAttributedString.Key: Any] = [
             .font: titleFont,
@@ -239,108 +239,146 @@ class PDFGenerator {
         return yPosition + titleSize.height
     }
 
-    private func drawBasicInfo(inputData: PDFInputData, yPosition: CGFloat) -> CGFloat {
+    private func drawPassDetailSection(inputData: PDFInputData, yPosition: CGFloat) -> CGFloat {
         var currentY = yPosition
 
         // セクションタイトル
-        currentY = drawSectionTitle("基本情報", yPosition: currentY)
+        currentY = drawSectionTitle("▼ 定期券詳細", yPosition: currentY)
         currentY += 10
 
         let font = UIFont.systemFont(ofSize: 12)
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy年MM月dd日"
 
+        // 終了日を計算
+        let endDate = calculateEndDate(startDate: inputData.startDate, passType: inputData.passType)
+
         // 情報項目
-        let basicInfoItems = [
-            ("計算方式", inputData.calculationType.description),
-            ("定期券種別", inputData.passType.description),
-            ("開始日", dateFormatter.string(from: inputData.startDate)),
-            ("払戻日", dateFormatter.string(from: inputData.refundDate)),
-            ("購入価格", "¥\(inputData.purchasePrice.formattedWithComma)"),
-            ("1ヶ月定期運賃", "¥\(inputData.oneMonthFare.formattedWithComma)")
+        let passDetailItems = [
+            ("種別", inputData.passType.description),
+            ("期間", "\(dateFormatter.string(from: inputData.startDate)) ～ \(dateFormatter.string(from: endDate))"),
+            ("購入価格", "¥\(inputData.purchasePrice.formattedWithComma)")
         ]
 
-        var items = basicInfoItems
-
-        if let oneWayFare = inputData.oneWayFare {
-            items.append(("片道普通運賃", "¥\(oneWayFare.formattedWithComma)"))
-        }
-
-        if let threeMonthFare = inputData.threeMonthFare {
-            items.append(("3ヶ月定期運賃", "¥\(threeMonthFare.formattedWithComma)"))
-        }
-
-        for (label, value) in items {
-            currentY = drawInfoRow(label: label, value: value, yPosition: currentY, font: font)
-            currentY += 5
+        for (label, value) in passDetailItems {
+            currentY = drawInfoRow(label: "\(label):", value: value, yPosition: currentY, font: font)
+            currentY += 18
         }
 
         return currentY
     }
 
-    private func drawResult(result: RefundResult, yPosition: CGFloat) -> CGFloat {
+    private func drawUsageStatusSection(result: RefundResult, inputData: PDFInputData, yPosition: CGFloat) -> CGFloat {
         var currentY = yPosition
 
         // セクションタイトル
-        currentY = drawSectionTitle("計算結果", yPosition: currentY)
+        currentY = drawSectionTitle("▼ 使用状況", yPosition: currentY)
         currentY += 10
 
-        // 払戻額（大きく表示）
-        let refundAmountText = "¥\(result.refundAmount.formattedWithComma)"
-        let refundFont = UIFont.boldSystemFont(ofSize: 28)
-        let refundColor = result.refundAmount > 0 ? UIColor.systemGreen : UIColor.systemRed
-        let refundAttributes: [NSAttributedString.Key: Any] = [
-            .font: refundFont,
-            .foregroundColor: refundColor
-        ]
+        let font = UIFont.systemFont(ofSize: 12)
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy年MM月dd日"
 
-        let refundSize = refundAmountText.size(withAttributes: refundAttributes)
-        let refundX = (pageWidth - refundSize.width) / 2
-        refundAmountText.draw(at: CGPoint(x: refundX, y: currentY), withAttributes: refundAttributes)
-        currentY += refundSize.height + 15
-
-        // 結果詳細
-        if result.refundAmount > 0 {
-            let font = UIFont.systemFont(ofSize: 12)
-            let resultItems = [
-                ("使用分運賃", "¥\(result.usedAmount.formattedWithComma)"),
-                ("手数料", "¥\(result.processingFee.formattedWithComma)")
-            ]
-
-            for (label, value) in resultItems {
-                currentY = drawInfoRow(label: label, value: value, yPosition: currentY, font: font)
-                currentY += 5
-            }
-        }
-
-        return currentY
-    }
-
-    private func drawCalculationDetails(result: RefundResult, calculationType: RefundCalculationType, yPosition: CGFloat) -> CGFloat {
-        var currentY = yPosition
-
-        // セクションタイトル
-        currentY = drawSectionTitle("計算詳細", yPosition: currentY)
-        currentY += 10
-
-        // 詳細内容
-        let detailFont = UIFont.systemFont(ofSize: 11)
-        let detailAttributes: [NSAttributedString.Key: Any] = [
-            .font: detailFont,
-            .foregroundColor: UIColor.darkGray
-        ]
-
-        let detailText = result.calculationDetails
-        let detailRect = CGRect(
-            x: margin,
-            y: currentY,
-            width: pageWidth - 2 * margin,
-            height: 200 // 十分な高さを確保
+        // 払戻申請日
+        currentY = drawInfoRow(
+            label: "払戻申請日:",
+            value: dateFormatter.string(from: inputData.refundDate),
+            yPosition: currentY,
+            font: font
         )
+        currentY += 18
 
-        detailText.draw(in: detailRect, withAttributes: detailAttributes)
+        // 実際使用期間
+        let usagePeriodInfo = createUsagePeriodInfo(inputData: inputData)
+        currentY = drawInfoRow(
+            label: "実際使用期間:",
+            value: usagePeriodInfo,
+            yPosition: currentY,
+            font: font
+        )
+        currentY += 18
 
-        return currentY + 50 // 適当な高さを追加
+        // 使用分運賃
+        currentY = drawInfoRow(
+            label: "使用分運賃:",
+            value: "¥\(result.usedAmount.formattedWithComma)",
+            yPosition: currentY,
+            font: font
+        )
+        currentY += 18
+
+        // 計算根拠（インデント付き）
+        let calculationBasis = createCalculationBasis(result: result, inputData: inputData)
+        currentY = drawInfoRow(
+            label: "　└ 計算根拠:",
+            value: calculationBasis,
+            yPosition: currentY,
+            font: font
+        )
+        currentY += 18
+
+        return currentY
+    }
+
+    private func drawRefundCalculationSection(result: RefundResult, inputData: PDFInputData, yPosition: CGFloat) -> CGFloat {
+        var currentY = yPosition
+
+        // セクションタイトル
+        let sectionTitle = "▼ 払戻金額（\(inputData.calculationType.description)）"
+        currentY = drawSectionTitle(sectionTitle, yPosition: currentY)
+        currentY += 15
+
+        let font = UIFont.systemFont(ofSize: 12)
+        let boldFont = UIFont.boldSystemFont(ofSize: 12)
+
+        // 計算詳細
+        currentY = drawCalculationRow(
+            label: "購入価格",
+            value: "¥\(inputData.purchasePrice.formattedWithComma)",
+            yPosition: currentY,
+            font: font
+        )
+        currentY += 18
+
+        currentY = drawCalculationRow(
+            label: "使用分運賃",
+            value: "-¥\(result.usedAmount.formattedWithComma)",
+            yPosition: currentY,
+            font: font
+        )
+        currentY += 18
+
+        currentY = drawCalculationRow(
+            label: "手数料",
+            value: "-¥\(result.processingFee.formattedWithComma)",
+            yPosition: currentY,
+            font: font
+        )
+        currentY += 18
+
+        // 罫線
+        currentY = drawSeparatorLine(yPosition: currentY)
+        currentY += 10
+
+        // 払戻金額
+        if result.refundAmount > 0 {
+            currentY = drawCalculationRow(
+                label: "払戻金額",
+                value: "¥\(result.refundAmount.formattedWithComma)",
+                yPosition: currentY,
+                font: boldFont
+            )
+        } else {
+            currentY = drawCalculationRow(
+                label: "払戻金額",
+                value: "払戻不可",
+                yPosition: currentY,
+                font: boldFont,
+                isError: true
+            )
+        }
+
+        return currentY + 30
     }
 
     private func drawSectionTitle(_ title: String, yPosition: CGFloat) -> CGFloat {
@@ -362,10 +400,14 @@ class PDFGenerator {
             .foregroundColor: UIColor.black
         ]
 
-        label.draw(at: CGPoint(x: margin, y: yPosition), withAttributes: attributes)
-        value.draw(at: CGPoint(x: margin + 150, y: yPosition), withAttributes: attributes)
+        if !label.isEmpty {
+            label.draw(at: CGPoint(x: margin, y: yPosition), withAttributes: attributes)
+            value.draw(at: CGPoint(x: margin + 150, y: yPosition), withAttributes: attributes)
+        } else {
+            value.draw(at: CGPoint(x: margin, y: yPosition), withAttributes: attributes)
+        }
 
-        let lineHeight = label.size(withAttributes: attributes).height
+        let lineHeight = value.size(withAttributes: attributes).height
         return yPosition + lineHeight
     }
 
@@ -382,6 +424,130 @@ class PDFGenerator {
         let footerX = (pageWidth - footerSize.width) / 2
 
         footerText.draw(at: CGPoint(x: footerX, y: footerY), withAttributes: footerAttributes)
+    }
+
+    // MARK: - ヘルパーメソッド
+
+    private func calculateEndDate(startDate: Date, passType: PassType) -> Date {
+        let calendar = Calendar.current
+        let tempEndDate: Date
+        switch passType {
+        case .oneMonth:
+            tempEndDate = calendar.date(byAdding: .month, value: 1, to: startDate) ?? startDate
+        case .threeMonths:
+            tempEndDate = calendar.date(byAdding: .month, value: 3, to: startDate) ?? startDate
+        case .sixMonths:
+            tempEndDate = calendar.date(byAdding: .month, value: 6, to: startDate) ?? startDate
+        }
+        return calendar.date(byAdding: .day, value: -1, to: tempEndDate) ?? tempEndDate
+    }
+
+    private func createUsagePeriodInfo(inputData: PDFInputData) -> String {
+        let calendar = Calendar.current
+        let normalizedStartDate = calendar.startOfDay(for: inputData.startDate)
+        let normalizedRefundDate = calendar.startOfDay(for: inputData.refundDate)
+
+        let elapsedComponents = calendar.dateComponents([.day], from: normalizedStartDate, to: normalizedRefundDate)
+        let elapsedDays = (elapsedComponents.day ?? 0) + 1
+
+        if inputData.calculationType == .sectionChange {
+            // 区間変更払戻の場合：旬数表示
+            let totalDays = elapsedDays
+            let fullJun = totalDays / 10
+            let remainder = totalDays % 10
+            let usedJun = fullJun + (remainder > 0 ? 1 : 0)
+            return "\(elapsedDays)日間（\(usedJun)旬）"
+        } else {
+            // 通常払戻の場合：月数表示
+            if elapsedDays <= 7 {
+                return "\(elapsedDays)日間（7日以内）"
+            } else {
+                let monthComponents = calendar.dateComponents([.month], from: inputData.startDate, to: inputData.refundDate)
+                let usedMonths = (monthComponents.month ?? 0) + 1
+                return "\(elapsedDays)日間（約\(usedMonths)ヶ月）"
+            }
+        }
+    }
+
+    private func createCalculationBasis(result: RefundResult, inputData: PDFInputData) -> String {
+        if inputData.calculationType == .sectionChange {
+            // 区間変更払戻の場合
+            switch inputData.passType {
+            case .oneMonth:
+                return "1ヶ月定期運賃 ¥\(inputData.oneMonthFare.formattedWithComma)"
+            case .threeMonths:
+                let fare = inputData.threeMonthFare ?? inputData.oneMonthFare
+                return "3ヶ月定期運賃 ¥\(fare.formattedWithComma)"
+            case .sixMonths:
+                return "6ヶ月定期運賃 ¥\(inputData.purchasePrice.formattedWithComma)"
+            }
+        } else {
+            // 通常払戻の場合
+            let calendar = Calendar.current
+            let normalizedStartDate = calendar.startOfDay(for: inputData.startDate)
+            let normalizedRefundDate = calendar.startOfDay(for: inputData.refundDate)
+            let elapsedComponents = calendar.dateComponents([.day], from: normalizedStartDate, to: normalizedRefundDate)
+            let elapsedDays = (elapsedComponents.day ?? 0) + 1
+
+            if elapsedDays <= 7 {
+                // 7日以内の場合
+                if let oneWayFare = inputData.oneWayFare {
+                    return "往復運賃 ¥\(oneWayFare * 2) × \(elapsedDays)日"
+                }
+            } else {
+                // 月単位計算の場合
+                let monthComponents = calendar.dateComponents([.month], from: inputData.startDate, to: inputData.refundDate)
+                let usedMonths = (monthComponents.month ?? 0) + 1
+
+                if inputData.passType == .sixMonths && usedMonths >= 3 {
+                    if let threeMonthFare = inputData.threeMonthFare {
+                        let additionalMonths = usedMonths - 3
+                        if additionalMonths > 0 {
+                            return "3ヶ月定期運賃 ¥\(threeMonthFare.formattedWithComma) + 1ヶ月定期運賃 ¥\(inputData.oneMonthFare.formattedWithComma) × \(additionalMonths)ヶ月"
+                        } else {
+                            return "3ヶ月定期運賃 ¥\(threeMonthFare.formattedWithComma)"
+                        }
+                    }
+                } else {
+                    return "1ヶ月定期運賃 ¥\(inputData.oneMonthFare.formattedWithComma) × \(usedMonths)ヶ月"
+                }
+            }
+        }
+        return "1ヶ月定期運賃 ¥\(inputData.oneMonthFare.formattedWithComma)"
+    }
+
+    private func drawCalculationRow(label: String, value: String, yPosition: CGFloat, font: UIFont, isError: Bool = false) -> CGFloat {
+        let labelAttributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: UIColor.black
+        ]
+
+        let valueColor = isError ? UIColor.systemRed : UIColor.black
+        let valueAttributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: valueColor
+        ]
+
+        // ラベルを左揃えで表示（適切な幅で調整）
+        label.draw(at: CGPoint(x: margin, y: yPosition), withAttributes: labelAttributes)
+
+        // 値を右揃えで表示
+        let valueSize = value.size(withAttributes: valueAttributes)
+        let valueX = pageWidth - margin - valueSize.width
+        value.draw(at: CGPoint(x: valueX, y: yPosition), withAttributes: valueAttributes)
+
+        return yPosition + valueSize.height
+    }
+
+    private func drawSeparatorLine(yPosition: CGFloat) -> CGFloat {
+        let context = UIGraphicsGetCurrentContext()
+        context?.setStrokeColor(UIColor.black.cgColor)
+        context?.setLineWidth(1.0)
+        context?.move(to: CGPoint(x: margin, y: yPosition))
+        context?.addLine(to: CGPoint(x: pageWidth - margin, y: yPosition))
+        context?.strokePath()
+
+        return yPosition + 5
     }
 }
 
