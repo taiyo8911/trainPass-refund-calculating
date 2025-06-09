@@ -73,8 +73,8 @@ struct RefundData {
         self.oneMonthFare = oneMonthFare
         self.threeMonthFare = threeMonthFare
 
-        // 固定値
-        self.processingFee = 220
+        // 固定値（修正：定数クラスを使用）
+        self.processingFee = CalculationConstants.processingFee
 
         // 往復普通運賃を計算
         self.roundTripFare = oneWayFare * 2
@@ -86,21 +86,11 @@ struct RefundData {
         let normalizedStartDate = calendar.startOfDay(for: startDate)
         let normalizedRefundDate = calendar.startOfDay(for: refundDate)
 
-        // 終了日を計算（開始日から期間後の前日）
-        let tempEndDate: Date
-        switch passType {
-        case .oneMonth:
-            tempEndDate = calendar.date(byAdding: .month, value: 1, to: normalizedStartDate) ?? normalizedStartDate
-        case .threeMonths:
-            tempEndDate = calendar.date(byAdding: .month, value: 3, to: normalizedStartDate) ?? normalizedStartDate
-        case .sixMonths:
-            tempEndDate = calendar.date(byAdding: .month, value: 6, to: normalizedStartDate) ?? normalizedStartDate
-        }
-        self.endDate = calendar.date(byAdding: .day, value: -1, to: tempEndDate) ?? tempEndDate
+        // 終了日を計算（修正：共通ヘルパーを使用）
+        self.endDate = CalculationHelpers.calculateEndDate(startDate: normalizedStartDate, passType: passType)
 
-        // 使用日数を計算（開始日を含む）
-        let elapsedComponents = calendar.dateComponents([.day], from: normalizedStartDate, to: normalizedRefundDate)
-        self.elapsedDays = (elapsedComponents.day ?? 0) + 1
+        // 使用日数を計算（修正：共通ヘルパーを使用）
+        self.elapsedDays = CalculationHelpers.calculateElapsedDays(from: normalizedStartDate, to: normalizedRefundDate)
 
         // 残存日数を計算
         let remainingComponents = calendar.dateComponents([.day], from: normalizedRefundDate, to: self.endDate)
@@ -110,22 +100,65 @@ struct RefundData {
         let remainingMonthComponents = calendar.dateComponents([.month], from: normalizedRefundDate, to: self.endDate)
         self.remainingMonths = remainingMonthComponents.month ?? 0
 
-        // 使用月数を計算（正規化した日付を使用）
-        let monthComponents = calendar.dateComponents([.month, .day], from: normalizedStartDate, to: normalizedRefundDate)
-        let months = (monthComponents.month ?? 0) + 1 // 開始月を含めるため+1
-        self.usedMonths = months
+        // 使用月数を計算（修正：月の区切りベース）
+        self.usedMonths = Self.calculateUsedMonths(
+            startDate: normalizedStartDate,
+            refundDate: normalizedRefundDate,
+            calendar: calendar
+        )
+    }
+
+    /// 使用月数を計算（月の区切りベース）
+    /// 修正後の仕様：
+    /// - 7日以内：日数計算を使用（0ヶ月扱い）
+    /// - 8日目以降：月の区切りで計算
+    /// - 例：6月5日開始の場合
+    ///   - 6月5日〜7月4日：1ヶ月目
+    ///   - 7月5日〜8月4日：2ヶ月目
+    private static func calculateUsedMonths(startDate: Date, refundDate: Date, calendar: Calendar) -> Int {
+        // 経過日数を計算（修正：共通ヘルパーを使用）
+        let elapsedDays = CalculationHelpers.calculateElapsedDays(from: startDate, to: refundDate)
+
+        // 7日以内の場合は0ヶ月扱い（日数計算を使用）
+        if elapsedDays <= CalculationConstants.withinSevenDaysThreshold {
+            return 0
+        }
+
+        // 8日目以降は月の区切りで計算
+        // 開始日から月単位で区切りを作って、払戻日がどの区切りに属するかを判定
+        var currentPeriodStart = startDate
+        var monthCount = 0
+
+        while true {
+            monthCount += 1
+
+            // 次の月の同日を計算
+            guard let nextPeriodStart = calendar.date(byAdding: .month, value: 1, to: currentPeriodStart) else {
+                break
+            }
+
+            // 払戻日が現在の期間内（currentPeriodStart <= refundDate < nextPeriodStart）かチェック
+            if refundDate < nextPeriodStart {
+                return monthCount
+            }
+
+            currentPeriodStart = nextPeriodStart
+        }
+
+        return monthCount
     }
 }
 
-/// 区間変更払い戻し計算専用データ
+/// 区間変更払い戻し計算専用データ（修正版）
+/// 修正内容：
+/// - 購入価格のみから日割運賃を計算（1ヶ月・3ヶ月定期運賃は不要）
+/// - 共通ヘルパー関数を使用して計算の一貫性を確保
 struct SectionChangeRefundData {
     // 基本入力データ
     let startDate: Date          // 開始日
     let passType: PassType       // 定期券種別
     let purchasePrice: Int       // 発売額
     let refundDate: Date         // 払戻日
-    let oneMonthFare: Int        // 1ヶ月定期運賃
-    let threeMonthFare: Int?     // 3ヶ月定期運賃（3・6ヶ月定期で必要）
 
     // 計算用データ（自動計算される）
     let elapsedDays: Int         // 経過日数（開始日含む）
@@ -134,43 +167,33 @@ struct SectionChangeRefundData {
     let processingFee: Int      // 払戻手数料（固定220円）
 
     /// イニシャライザ：基本データから計算用データを自動生成
-    init(startDate: Date, passType: PassType, purchasePrice: Int, refundDate: Date, oneMonthFare: Int, threeMonthFare: Int?) {
+    /// 修正内容：
+    /// - 購入価格のみから日割運賃を計算（定期運賃入力不要）
+    /// - 共通ヘルパー関数とConstants使用で計算の統一性を確保
+    /// - 1円未満切り上げのロジックを共通化
+    init(startDate: Date, passType: PassType, purchasePrice: Int, refundDate: Date) {
         // 基本データ
         self.startDate = startDate
         self.passType = passType
         self.purchasePrice = purchasePrice
         self.refundDate = refundDate
-        self.oneMonthFare = oneMonthFare
-        self.threeMonthFare = threeMonthFare
 
-        // 固定値
-        self.processingFee = 220
+        // 固定値（修正：定数クラスを使用）
+        self.processingFee = CalculationConstants.processingFee
 
-        // 経過日数を計算（開始日を含む）- 時刻の影響を排除
+        // 経過日数を計算（修正：共通ヘルパーを使用）
         let calendar = Calendar.current
         let normalizedStartDate = calendar.startOfDay(for: startDate)
         let normalizedRefundDate = calendar.startOfDay(for: refundDate)
 
-        let elapsedComponents = calendar.dateComponents([.day], from: normalizedStartDate, to: normalizedRefundDate)
-        self.elapsedDays = (elapsedComponents.day ?? 0) + 1
+        self.elapsedDays = CalculationHelpers.calculateElapsedDays(from: normalizedStartDate, to: normalizedRefundDate)
 
-        // 使用旬数を計算（開始日から10日ずつ、端数は1旬）
-        let totalDays = self.elapsedDays
-        let fullJun = totalDays / 10
-        let remainder = totalDays % 10
-        self.usedJun = fullJun + (remainder > 0 ? 1 : 0)
+        // 使用旬数を計算（修正：共通ヘルパーを使用）
+        self.usedJun = CalculationHelpers.calculateJun(from: self.elapsedDays)
 
-        // 日割運賃を計算（1円未満切り上げ）
-        let fare: Double
-        switch passType {
-        case .oneMonth:
-            fare = Double(oneMonthFare) / 30.0 // 1ヶ月定期÷30日
-        case .threeMonths:
-            fare = Double(threeMonthFare ?? oneMonthFare) / 90.0 // 3ヶ月定期÷90日
-        case .sixMonths:
-            fare = Double(purchasePrice) / 180.0 // 6ヶ月定期÷180日
-        }
-        self.dailyFare = Int(ceil(fare)) // 1円未満切り上げ
+        // 日割運賃を計算（購入価格ベース、修正：共通ヘルパーと定数を使用）
+        let baseDays = CalculationConstants.baseDaysFor(passType)
+        self.dailyFare = CalculationHelpers.calculateDailyFare(amount: purchasePrice, days: baseDays)
     }
 }
 

@@ -213,3 +213,6 @@ struct ResultActionButtonsCard: View {
 
     return ResultModalView(calculationState: state)
 }
+
+
+

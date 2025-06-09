@@ -65,10 +65,24 @@ class RefundDataValidator {
 
 class RefundCalculationEngine {
 
-    func calculate(_ data: RefundData) -> (RefundResult, RefundCalculationDetail) {
-        // 7日以内かどうかで計算方法を分岐
-        if data.elapsedDays <= 7 {
-            return calculateWithinSevenDays(data)
+    /// 計算エラー（修正：fatalErrorの安全な代替として実装）
+    /// アプリクラッシュを防ぎ、適切なエラー情報を提供
+    enum CalculationError: Error {
+        case missingThreeMonthFareForSixMonth
+
+        var message: String {
+            switch self {
+            case .missingThreeMonthFareForSixMonth:
+                return "6ヶ月定期の計算には3ヶ月定期運賃が必要です"
+            }
+        }
+    }
+
+    func calculate(_ data: RefundData) -> Result<(RefundResult, RefundCalculationDetail), CalculationError> {
+        // 7日以内かどうかで計算方法を分岐（修正：定数を使用）
+        if data.elapsedDays <= CalculationConstants.withinSevenDaysThreshold {
+            let result = calculateWithinSevenDays(data)
+            return .success(result)
         } else {
             return calculateMonthlyBasis(data)
         }
@@ -103,51 +117,60 @@ class RefundCalculationEngine {
 
     // MARK: - 月単位計算
 
-    private func calculateMonthlyBasis(_ data: RefundData) -> (RefundResult, RefundCalculationDetail) {
+    private func calculateMonthlyBasis(_ data: RefundData) -> Result<(RefundResult, RefundCalculationDetail), CalculationError> {
         // 1ヶ月定期の場合は7日以降は払戻なし
         if data.passType == .oneMonth {
-            return createNoRefundResult(data, reason: "1ヶ月定期は使用開始から8日以降は払戻不可（経過日数: \(data.elapsedDays)日）")
+            let result = createNoRefundResult(data, reason: "1ヶ月定期は使用開始から8日以降は払戻不可（経過日数: \(data.elapsedDays)日）")
+            return .success(result)
         }
 
         // 残存期間チェック
         if data.remainingMonths < 1 {
-            return createNoRefundResult(data, reason: "残存期間が1ヶ月未満のため払戻不可（経過日数: \(data.elapsedDays)日）")
+            let result = createNoRefundResult(data, reason: "残存期間が1ヶ月未満のため払戻不可（経過日数: \(data.elapsedDays)日）")
+            return .success(result)
         }
 
-        // 使用分運賃を計算
-        let usedFare = calculateUsedFare(data)
-        let calculationResult = data.purchasePrice - usedFare - data.processingFee
+        // 使用分運賃を計算（修正：安全なエラーハンドリング）
+        let usedFareResult = calculateUsedFare(data)
+        switch usedFareResult {
+        case .success(let usedFare):
+            let calculationResult = data.purchasePrice - usedFare - data.processingFee
 
-        if calculationResult <= 0 {
-            return createNoRefundResult(data, reason: "計算結果がマイナスまたは0円のため払戻不可（経過日数: \(data.elapsedDays)日）")
+            if calculationResult <= 0 {
+                let result = createNoRefundResult(data, reason: "計算結果がマイナスまたは0円のため払戻不可（経過日数: \(data.elapsedDays)日）")
+                return .success(result)
+            }
+
+            let detail = RefundCalculationDetail(
+                calculationMethod: .monthlyCalculation,
+                usedDays: data.elapsedDays,
+                usedMonths: data.usedMonths,
+                appliedRule: "月単位の通常計算",
+                calculationSteps: createCalculationSteps(data, usedFare: usedFare, refundAmount: calculationResult)
+            )
+
+            let result = RefundResult(
+                refundAmount: calculationResult,
+                usedAmount: usedFare,
+                processingFee: data.processingFee,
+                calculationDetails: "\(data.passType.description): 使用\(data.usedMonths)ヶ月（経過日数: \(data.elapsedDays)日）、使用分運賃\(usedFare)円"
+            )
+
+            return .success((result, detail))
+
+        case .failure(let error):
+            return .failure(error)
         }
-
-        let detail = RefundCalculationDetail(
-            calculationMethod: .monthlyCalculation,
-            usedDays: data.elapsedDays,
-            usedMonths: data.usedMonths,
-            appliedRule: "月単位の通常計算",
-            calculationSteps: createCalculationSteps(data, usedFare: usedFare, refundAmount: calculationResult)
-        )
-
-        let result = RefundResult(
-            refundAmount: calculationResult,
-            usedAmount: usedFare,
-            processingFee: data.processingFee,
-            calculationDetails: "\(data.passType.description): 使用\(data.usedMonths)ヶ月（経過日数: \(data.elapsedDays)日）、使用分運賃\(usedFare)円"
-        )
-
-        return (result, detail)
     }
 
-    // MARK: - 使用分運賃計算
+    // MARK: - 使用分運賃計算（修正：安全なエラーハンドリング）
 
-    private func calculateUsedFare(_ data: RefundData) -> Int {
+    private func calculateUsedFare(_ data: RefundData) -> Result<Int, CalculationError> {
         switch data.passType {
         case .oneMonth:
-            return data.purchasePrice // 実質的に使用されない
+            return .success(data.purchasePrice) // 実質的に使用されない
         case .threeMonths:
-            return calculateThreeMonthUsedFare(data)
+            return .success(calculateThreeMonthUsedFare(data))
         case .sixMonths:
             return calculateSixMonthUsedFare(data)
         }
@@ -163,17 +186,17 @@ class RefundCalculationEngine {
         }
     }
 
-    private func calculateSixMonthUsedFare(_ data: RefundData) -> Int {
+    private func calculateSixMonthUsedFare(_ data: RefundData) -> Result<Int, CalculationError> {
         guard let threeMonthFare = data.threeMonthFare else {
-            fatalError("6ヶ月定期の計算には3ヶ月定期運賃が必要です")
+            return .failure(.missingThreeMonthFareForSixMonth)
         }
 
         if data.usedMonths <= 2 {
-            return data.oneMonthFare * data.usedMonths
+            return .success(data.oneMonthFare * data.usedMonths)
         } else {
             // 3ヶ月以上使用の場合は3ヶ月定期運賃 + 追加月数
             let additionalMonths = data.usedMonths - 3
-            return threeMonthFare + (data.oneMonthFare * additionalMonths)
+            return .success(threeMonthFare + (data.oneMonthFare * additionalMonths))
         }
     }
 
@@ -251,6 +274,12 @@ class RefundCalculationLogger {
         print()
     }
 
+    func logCalculationError(_ error: RefundCalculationEngine.CalculationError) {
+        guard isEnabled else { return }
+        print("❌ 計算エラー: \(error.message)")
+        print()
+    }
+
     private func logBasicInfo(_ data: RefundData) {
         print("✅ 基本情報")
         print("   定期券種別: \(data.passType.description)")
@@ -288,9 +317,7 @@ class RefundCalculationLogger {
     }
 
     private func formatDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy年MM月dd日"
-        return formatter.string(from: date)
+        return CommonDateFormatters.standard.string(from: date)
     }
 }
 
@@ -305,7 +332,7 @@ class RegularRefundCalculator {
         self.logger = RefundCalculationLogger(isEnabled: enableLogging)
     }
 
-    /// 通常払戻計算のメインエントリーポイント
+    /// 通常払戻計算のメインエントリーポイント（修正：安全なエラーハンドリング）
     func calculate(data: RefundData) -> RefundResult {
         // 1. 入力検証
         switch validator.validate(data) {
@@ -321,13 +348,22 @@ class RegularRefundCalculator {
             )
         }
 
-        // 2. 計算実行
-        let (result, detail) = engine.calculate(data)
+        // 2. 計算実行（修正：安全なエラーハンドリング）
+        switch engine.calculate(data) {
+        case .success(let (result, detail)):
+            // 3. ログ出力
+            logger.logCalculation(data, result: result, detail: detail)
+            return result
 
-        // 3. ログ出力
-        logger.logCalculation(data, result: result, detail: detail)
-
-        return result
+        case .failure(let error):
+            logger.logCalculationError(error)
+            return RefundResult(
+                refundAmount: 0,
+                usedAmount: 0,
+                processingFee: data.processingFee,
+                calculationDetails: "計算エラー: \(error.message)"
+            )
+        }
     }
 
     /// ログ出力なしの計算（テスト用など）

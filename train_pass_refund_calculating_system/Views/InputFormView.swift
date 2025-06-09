@@ -97,7 +97,7 @@ struct CompactInputFormSection: View {
     }
 }
 
-// MARK: - 金額入力セクション
+// MARK: - 金額入力セクション（修正：区間変更払戻の入力要件に対応）
 struct CompactPriceInputSection: View {
     @Bindable var calculationState: RefundCalculationState
 
@@ -112,13 +112,15 @@ struct CompactPriceInputSection: View {
                 calculationState.resetResult()
             }
 
-            // 1ヶ月定期運賃（常に表示）
-            CompactPriceField(
-                title: "1ヶ月定期運賃",
-                value: $calculationState.oneMonthFare,
-                placeholder: "1ヶ月運賃"
-            ) {
-                calculationState.resetResult()
+            // 1ヶ月定期運賃（通常払戻のみ）
+            if calculationState.needsOneMonthFare {
+                CompactPriceField(
+                    title: "1ヶ月定期運賃",
+                    value: $calculationState.oneMonthFare,
+                    placeholder: "1ヶ月運賃"
+                ) {
+                    calculationState.resetResult()
+                }
             }
 
             // 片道普通運賃（通常払戻のみ）
@@ -132,7 +134,7 @@ struct CompactPriceInputSection: View {
                 }
             }
 
-            // 3ヶ月定期運賃（6ヶ月定期のみ）
+            // 3ヶ月定期運賃（通常払戻で6ヶ月定期のみ）
             if calculationState.needsThreeMonthFare {
                 CompactPriceField(
                     title: "3ヶ月定期運賃",

@@ -85,16 +85,16 @@ class SectionChangeCalculationEngine {
             junDetail = "\(data.elapsedDays)日 = \(fullJun)旬 + \(remainder)日 → \(data.usedJun)旬（端数切り上げ）"
         }
 
-        // 日割運賃計算の詳細
+        // 日割運賃計算の詳細（修正：購入価格ベースの計算に変更）
+        // すべての定期券種別で購入価格を基準とする統一的なアプローチ
         let dailyFareDetail: String
         switch data.passType {
         case .oneMonth:
-            dailyFareDetail = "\(data.oneMonthFare)円 ÷ 30日 = \(data.dailyFare)円/日（切り上げ）"
+            dailyFareDetail = "\(data.purchasePrice)円 ÷ \(CalculationConstants.oneMonthDays)日 = \(data.dailyFare)円/日（切り上げ）"
         case .threeMonths:
-            let fare = data.threeMonthFare ?? data.oneMonthFare
-            dailyFareDetail = "\(fare)円 ÷ 90日 = \(data.dailyFare)円/日（切り上げ）"
+            dailyFareDetail = "\(data.purchasePrice)円 ÷ \(CalculationConstants.threeMonthDays)日 = \(data.dailyFare)円/日（切り上げ）"
         case .sixMonths:
-            dailyFareDetail = "\(data.purchasePrice)円 ÷ 180日 = \(data.dailyFare)円/日（切り上げ）"
+            dailyFareDetail = "\(data.purchasePrice)円 ÷ \(CalculationConstants.sixMonthDays)日 = \(data.dailyFare)円/日（切り上げ）"
         }
 
         return SectionChangeCalculationDetail(
@@ -162,9 +162,7 @@ class SectionChangeCalculationLogger {
     }
 
     private func formatDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy年MM月dd日"
-        return formatter.string(from: date)
+        return CommonDateFormatters.standard.string(from: date)
     }
 }
 
@@ -246,9 +244,7 @@ class SectionChangeRefundDemo {
                     startDate: dateFormatter.date(from: "2025-02-07")!,
                     passType: .threeMonths,
                     purchasePrice: 45000,
-                    refundDate: dateFormatter.date(from: "2025-03-16")!,
-                    oneMonthFare: 16000,
-                    threeMonthFare: 45000
+                    refundDate: dateFormatter.date(from: "2025-03-16")!
                 )
             ),
             (
@@ -257,9 +253,7 @@ class SectionChangeRefundDemo {
                     startDate: dateFormatter.date(from: "2025-02-07")!,
                     passType: .oneMonth,
                     purchasePrice: 16000,
-                    refundDate: dateFormatter.date(from: "2025-02-16")!,
-                    oneMonthFare: 16000,
-                    threeMonthFare: nil
+                    refundDate: dateFormatter.date(from: "2025-02-16")!
                 )
             ),
             (
@@ -268,9 +262,7 @@ class SectionChangeRefundDemo {
                     startDate: dateFormatter.date(from: "2025-02-07")!,
                     passType: .threeMonths,
                     purchasePrice: 45000,
-                    refundDate: dateFormatter.date(from: "2025-02-17")!,
-                    oneMonthFare: 16000,
-                    threeMonthFare: 45000
+                    refundDate: dateFormatter.date(from: "2025-02-17")!
                 )
             )
         ]
